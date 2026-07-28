@@ -22,7 +22,7 @@
         <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <span>🛠️</span> פאנל ניהול שיחות
         </h1>
-        <p class="text-sm text-slate-500 dark:text-gray-400 mt-1">צפייה, עריכה ומחיקה של חדרים והודעות בזמן אמת</p>
+        <p class="text-sm text-slate-500 dark:text-gray-400 mt-1">צפייה, עריכה ומחיקה של חדרים, הודעות ותמונות בזמן אמת</p>
       </div>
       <div class="flex items-center gap-3">
         <!-- מתג מצב לילה / יום -->
@@ -99,8 +99,7 @@
   <script>
     // ⚠️ התאמת הגדרות Firebase
     const firebaseConfig = {
-      databaseURL:  "https://en-shemer-booking-default-rtdb.europe-west1.firebasedatabase.app"        
-        //"https://en-shemer-booking-default-rtdb.firebaseio.com"
+      databaseURL: "https://en-shemer-booking-default-rtdb.firebaseio.com"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -217,14 +216,26 @@
         const card = document.createElement("div");
         card.className = "bg-white dark:bg-gray-800 p-3.5 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm flex flex-col gap-2 relative group transition-colors";
 
+        // תצוגת תמונה במידה וקיימת בהודעה
+        const imageHtml = msg.image 
+          ? `<div class="mt-1">
+               <a href="${msg.image}" target="_blank" title="לחץ להגדלה">
+                 <img src="${msg.image}" class="rounded-lg max-h-48 max-w-full object-cover border border-slate-200 dark:border-gray-700 hover:opacity-90 transition">
+               </a>
+             </div>` 
+          : '';
+
+        const textHtml = msg.text ? `<div class="text-slate-800 dark:text-gray-100 text-sm break-words">${escapeHtml(msg.text)}</div>` : '';
+
         card.innerHTML = `
           <div class="flex justify-between items-center text-xs text-slate-400 dark:text-gray-500 border-b border-slate-50 dark:border-gray-700 pb-1.5">
             <span class="font-mono bg-slate-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-gray-300">${msg.sender || 'אנונימי'}</span>
             <span>${dateStr}</span>
           </div>
-          <div class="text-slate-800 dark:text-gray-100 text-sm break-words">${escapeHtml(msg.text)}</div>
+          ${imageHtml}
+          ${textHtml}
           <div class="flex justify-end gap-3 pt-1 border-t border-slate-50 dark:border-gray-700">
-            <button onclick="openEditModal('${msgKey}', \`${escapeJsString(msg.text)}\`)" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold transition">
+            <button onclick="openEditModal('${msgKey}', \`${escapeJsString(msg.text || '')}\`)" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold transition">
               ✏️ ערוך
             </button>
             <button onclick="deleteMessage('${msgKey}')" class="text-xs text-red-500 dark:text-red-400 hover:underline font-semibold transition">
@@ -274,7 +285,7 @@
 
     document.getElementById("saveEditBtn").onclick = () => {
       const newText = document.getElementById("editInput").value.trim();
-      if (!newText || !activeRoomId || !editingMsgKey) return;
+      if (!activeRoomId || !editingMsgKey) return;
 
       db.ref(`chats/${activeRoomId}/${editingMsgKey}/text`).set(newText)
         .then(() => closeEditModal());
