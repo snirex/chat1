@@ -24,7 +24,11 @@
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 h-full flex flex-col transition-colors">
 
   <!-- מסך כניסה ורשימת חדרים -->
-  <div id="roomSelectionScreen" class="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4 overflow-y-auto">
+  <div id="roomSelectionScreen" class="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 flex flex-col justify-between items-center p-4 overflow-y-auto">
+    
+    <!-- רווח מתווך ליישור למרכז -->
+    <div></div>
+
     <div class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-100 dark:border-gray-700 space-y-5 my-auto">
       
       <div class="flex justify-between items-center">
@@ -69,6 +73,24 @@
       </div>
 
     </div>
+
+    <!-- 🔻 FOOTER קרדיט מפתח 🔻 -->
+    <footer class="py-4 text-center text-xs text-gray-500 dark:text-gray-400 space-y-1">
+      <p>
+        בנוי על ידי <span class="font-bold text-indigo-600 dark:text-indigo-400">שניר אלגבסי</span> © 2026
+      </p>
+      <p>
+        This chat was made by <span class="font-bold text-indigo-600 dark:text-indigo-400">Snir Elgabsi</span> © 2026
+      </p>
+      <div class="flex justify-center gap-3 text-[11px] text-gray-400 dark:text-gray-500">
+        <a href="https://github.com/snirex" target="_blank" class="hover:text-indigo-500 transition">GitHub</a>
+        <span>•</span>
+        <a href="https://www.linkedin.com/in/snir-elgabsi" target="_blank" class="hover:text-indigo-500 transition">LinkedIn</a>
+        <span>•</span>
+        <a href="mailto:elsnir@gmail.com" class="hover:text-indigo-500 transition">צור קשר</a>
+      </div>
+    </footer>
+
   </div>
 
   <!-- מסך צ'אט -->
@@ -212,7 +234,7 @@
     // --- 1. הקראת הודעות קולית (Text-To-Speech) ---
     function speakText(text, langCode) {
       if (!('speechSynthesis' in window)) return alert('הדפדפן שלך אינו תומך בהקראת קול');
-      window.speechSynthesis.cancel(); // עצירת הקראה קודמת במידה ופועלת
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = langCode;
       window.speechSynthesis.speak(utterance);
@@ -245,7 +267,7 @@
         micBtn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
       };
     } else {
-      micBtn.style.display = 'none'; // הסתרה אם הדפדפן אינו תומך
+      micBtn.style.display = 'none';
     }
 
     // --- 3. חיווי מקליד/ה בזמן אמת ---
@@ -424,7 +446,6 @@
           const usersCount = data.users ? Object.keys(data.users).length : 1;
           onlineUsersCount.innerText = `👥 ${usersCount} מחוברים`;
 
-          // האזנה לחיווי הקלדה
           if (data.typing) {
             const typers = Object.keys(data.typing).filter(id => id !== userId);
             if (typers.length > 0) {
@@ -504,7 +525,6 @@
       let imgHtml = imageUrl ? `<a href="${imageUrl}" target="_blank"><img src="${imageUrl}" class="rounded-xl mb-2 max-h-60 w-full object-cover shadow-sm hover:opacity-95 transition"></a>` : '';
       let textHtml = textToShow ? `<div class="msg-content break-words">${textToShow}</div>` : '';
       
-      // כפתור הקראה קולית להודעות נכנסות
       let ttsBtn = (!isMe && textToShow) ? `<button onclick="speakText(this.previousElementSibling.innerText, '${myLanguage}')" class="text-xs opacity-70 hover:opacity-100 mt-1" title="הקרא הודעה">🔊 השמע</button>` : '';
       
       let subText = (!isMe && originalText) ? `<div class="text-[10px] opacity-60 mt-1.5 pt-1 border-t border-gray-200/30">מקור: ${originalText}</div>` : '';
