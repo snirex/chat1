@@ -21,9 +21,9 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 h-full flex flex-col transition-colors">
 
-  <!-- מסך כניסה -->
-  <div id="roomSelectionScreen" class="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4">
-    <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-100 dark:border-gray-700 space-y-5">
+  <!-- מסך כניסה ורשימת חדרים -->
+  <div id="roomSelectionScreen" class="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4 overflow-y-auto">
+    <div class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-100 dark:border-gray-700 space-y-5 my-auto">
       
       <div class="flex justify-between items-center">
         <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">צ'אט מתורגם</h1>
@@ -45,13 +45,27 @@
 
         <div>
           <label class="block text-xs font-semibold mb-1 text-gray-500 dark:text-gray-400">קוד חדר</label>
-          <input type="text" id="roomCodeInput" placeholder="למשל: 123" value="" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-bold" dir="ltr">
+          <input type="text" id="roomCodeInput" placeholder="למשל: 123" value="123" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-bold" dir="ltr">
         </div>
 
         <button id="joinRoomBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg active:scale-95 transition">
           היכנס לחדר
         </button>
       </div>
+
+      <hr class="border-gray-200 dark:border-gray-700">
+
+      <!-- רשימת חדרים פעילים -->
+      <div>
+        <h2 class="text-xs font-semibold mb-2 text-gray-500 dark:text-gray-400 flex justify-between items-center">
+          <span>חדרים פעילים כעת</span>
+          <span id="activeRoomsCount" class="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full text-[10px]">0</span>
+        </h2>
+        <div id="activeRoomsList" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+          <div class="text-center text-xs text-gray-400 py-3">אין חדרים פעילים ברגע זה</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -65,8 +79,16 @@
           <div class="flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
             <h2 id="currentRoomTitle" class="font-bold text-sm">חדר: ---</h2>
+            <!-- כפתור נעילת חדר -->
+            <button id="lockRoomBtn" title="נעול/שחרר חדר" class="text-xs p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+              🔓
+            </button>
           </div>
-          <span id="currentLangBadge" class="text-[10px] text-gray-400 block">שפה: עברית</span>
+          <div class="flex items-center gap-2 text-[10px] text-gray-400">
+            <span id="currentLangBadge">שפה: עברית</span>
+            <span>•</span>
+            <span id="onlineUsersCount">👥 1 מחוברים</span>
+          </div>
         </div>
       </div>
       <button id="themeToggleChat" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-700">🌙</button>
@@ -88,7 +110,6 @@
     <footer class="p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
       <form id="messageForm" class="flex items-center gap-2">
         
-        <!-- כפתור העלאת תמונה -->
         <label for="imageInput" class="p-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-2xl cursor-pointer text-gray-600 dark:text-gray-300 transition flex items-center justify-center">
           📷
           <input type="file" id="imageInput" accept="image/*" class="hidden">
@@ -106,15 +127,20 @@
 
   <script>
     const firebaseConfig = {
-      databaseURL: "https://en-shemer-booking-default-rtdb.europe-west1.firebasedatabase.app"  
+      databaseURL: "https://en-shemer-booking-default-rtdb.firebaseio.com"
     };
 
     firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     const userId = "user_" + Math.random().toString(36).substr(2, 7);
+    let currentRoomId = null;
     let currentRoomRef = null;
+    let roomMetaRef = null;
+    let myPresenceRef = null;
     let myLanguage = "he";
     let selectedImageBase64 = null;
+    let isRoomLocked = false;
 
     const roomSelectionScreen = document.getElementById('roomSelectionScreen');
     const chatScreen = document.getElementById('chatScreen');
@@ -122,8 +148,10 @@
     const userLanguageSelect = document.getElementById('userLanguage');
     const joinRoomBtn = document.getElementById('joinRoomBtn');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+    const lockRoomBtn = document.getElementById('lockRoomBtn');
     const currentRoomTitle = document.getElementById('currentRoomTitle');
     const currentLangBadge = document.getElementById('currentLangBadge');
+    const onlineUsersCount = document.getElementById('onlineUsersCount');
     const chatBox = document.getElementById('chatBox');
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
@@ -131,6 +159,7 @@
     const imagePreviewContainer = document.getElementById('imagePreviewContainer');
     const imagePreview = document.getElementById('imagePreview');
     const cancelImageBtn = document.getElementById('cancelImageBtn');
+    const activeRoomsList = document.getElementById('activeRoomsList');
 
     // Theme Toggle
     function toggleDarkMode() {
@@ -142,7 +171,50 @@
     document.getElementById('themeToggleLogin').addEventListener('click', toggleDarkMode);
     document.getElementById('themeToggleChat').addEventListener('click', toggleDarkMode);
 
-    // טיפול בבחירת תמונה וכיווצה
+    // --- טעינת רשימת החדרים הפעילים בזמן אמת ---
+    db.ref('room_meta').on('value', (snapshot) => {
+      const rooms = snapshot.val();
+      activeRoomsList.innerHTML = '';
+
+      if (!rooms) {
+        activeRoomsList.innerHTML = `<div class="text-center text-xs text-gray-400 py-3">אין חדרים פעילים ברגע זה</div>`;
+        document.getElementById('activeRoomsCount').innerText = '0';
+        return;
+      }
+
+      const keys = Object.keys(rooms);
+      document.getElementById('activeRoomsCount').innerText = keys.length;
+
+      keys.forEach((rId) => {
+        const meta = rooms[rId];
+        const usersCount = meta.users ? Object.keys(meta.users).length : 0;
+
+        // אם אין משתמשים בחדר, ננקה אותו
+        if (usersCount === 0) {
+          db.ref(`room_meta/${rId}`).remove();
+          return;
+        }
+
+        const isLocked = meta.locked || false;
+
+        const roomCard = document.createElement('div');
+        roomCard.className = "flex justify-between items-center p-2.5 bg-gray-50 dark:bg-gray-700/60 rounded-xl border border-gray-100 dark:border-gray-600 hover:border-indigo-300 transition cursor-pointer";
+        roomCard.onclick = () => { roomCodeInput.value = rId; };
+
+        roomCard.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold font-mono text-gray-700 dark:text-gray-200">${rId}</span>
+            <span class="text-xs">${isLocked ? '🔒' : '🔓'}</span>
+          </div>
+          <span class="text-[11px] bg-indigo-50 dark:bg-gray-600 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-md font-semibold">
+            👤 ${usersCount} מחוברים
+          </span>
+        `;
+        activeRoomsList.appendChild(roomCard);
+      });
+    });
+
+    // כיווץ תמונות
     imageInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -151,9 +223,8 @@
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
-          // כיווץ התמונה לגודל סביר לשרת
           const canvas = document.createElement('canvas');
-          const maxDim = 800; // מקסימום רוחב/גובה 800 פיקסלים
+          const maxDim = 800;
           let width = img.width;
           let height = img.height;
 
@@ -170,7 +241,7 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.7); // איכות 70%
+          selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
           imagePreview.src = selectedImageBase64;
           imagePreviewContainer.classList.remove('hidden');
           imagePreviewContainer.classList.add('flex');
@@ -200,14 +271,27 @@
     }
 
     // כניסה לחדר
-    joinRoomBtn.addEventListener('click', () => {
+    joinRoomBtn.addEventListener('click', async () => {
       const rawRoomCode = roomCodeInput.value.trim().toLowerCase();
       if (!rawRoomCode) return alert('נא להזין קוד חדר');
 
-      const roomId = rawRoomCode.replace(/[^a-z0-9_-]/g, '');
+      currentRoomId = rawRoomCode.replace(/[^a-z0-9_-]/g, '');
       myLanguage = userLanguageSelect.value;
 
-      currentRoomTitle.innerText = `חדר: ${roomId}`;
+      // בדיקה אם החדר נעול לפני הכניסה
+      const roomSnap = await db.ref(`room_meta/${currentRoomId}`).once('value');
+      const roomMeta = roomSnap.val();
+
+      if (roomMeta && roomMeta.locked) {
+        // בודק אם המשתמש כבר רשום בחדר
+        const isUserInside = roomMeta.users && roomMeta.users[userId];
+        if (!isUserInside) {
+          alert('🔒 חדר זה נעול לכניסת משתמשים חדשים על ידי יושבי החדר!');
+          return;
+        }
+      }
+
+      currentRoomTitle.innerText = `חדר: ${currentRoomId}`;
       currentLangBadge.innerText = `שפה: ${userLanguageSelect.options[userLanguageSelect.selectedIndex].text.split(' ')[0]}`;
 
       roomSelectionScreen.classList.add('hidden');
@@ -215,8 +299,27 @@
       chatScreen.classList.add('flex');
 
       chatBox.innerHTML = '';
-      currentRoomRef = firebase.database().ref(`chats/${roomId}`);
+      currentRoomRef = db.ref(`chats/${currentRoomId}`);
+      roomMetaRef = db.ref(`room_meta/${currentRoomId}`);
 
+      // רישום נוכחות המשתמש בחדר
+      myPresenceRef = db.ref(`room_meta/${currentRoomId}/users/${userId}`);
+      myPresenceRef.set(true);
+      myPresenceRef.onDisconnect().remove(); // מוחק את המשתמש אוטומטית כשהוא מנתק/סוגר את הלשונית
+
+      // האזנה לשינויים בנעילה ובמספר המשתמשים
+      roomMetaRef.on('value', (snap) => {
+        const data = snap.val();
+        if (data) {
+          isRoomLocked = data.locked || false;
+          lockRoomBtn.innerText = isRoomLocked ? '🔒' : '🔓';
+          
+          const usersCount = data.users ? Object.keys(data.users).length : 1;
+          onlineUsersCount.innerText = `👥 ${usersCount} מחוברים`;
+        }
+      });
+
+      // טעינת הודעות
       currentRoomRef.limitToLast(50).on('child_added', (snapshot) => {
         const msg = snapshot.val();
         const msgKey = snapshot.key;
@@ -232,9 +335,19 @@
       });
     });
 
+    // נעילה / שחרור חדר
+    lockRoomBtn.addEventListener('click', () => {
+      if (!roomMetaRef) return;
+      isRoomLocked = !isRoomLocked;
+      roomMetaRef.child('locked').set(isRoomLocked);
+    });
+
     // יציאה מחדר
     leaveRoomBtn.addEventListener('click', () => {
+      if (myPresenceRef) myPresenceRef.remove();
       if (currentRoomRef) currentRoomRef.off();
+      if (roomMetaRef) roomMetaRef.off();
+
       chatScreen.classList.add('hidden');
       chatScreen.classList.remove('flex');
       roomSelectionScreen.classList.remove('hidden');
@@ -255,10 +368,9 @@
       });
 
       messageInput.value = '';
-      cancelImageBtn.click(); // איפוס התמונה שנבחרה
+      cancelImageBtn.click();
     });
 
-    // יצירת אלמנט הודעה בצ'אט
     function appendMessageElement(key, textToShow, originalText, imageUrl, isMe) {
       const wrapper = document.createElement('div');
       wrapper.id = `msg-${key}`;
