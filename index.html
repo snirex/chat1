@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>צ'אט מתורגם בזמן אמת</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-msg { animation: fadeIn 0.2s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 h-full flex flex-col transition-colors">
+
+  <!-- מסך כניסה ורשימת חדרים -->
+  <div id="roomSelectionScreen" class="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4 overflow-y-auto">
+    <div class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-100 dark:border-gray-700 space-y-5 my-auto">
+      
+      <div class="flex justify-between items-center">
+        <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">צ'אט מתורגם</h1>
+        <button id="themeToggleLogin" class="p-2 rounded-full bg-gray-100 dark:bg-gray-700">🌙</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-gray-500 dark:text-gray-400">השפה שלי</label>
+          <select id="userLanguage" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            <option value="he">עברית (Hebrew)</option>
+            <option value="en">אנגלית (English)</option>
+            <option value="es">ספרדית (Spanish)</option>
+            <option value="fr">צרפתית (French)</option>
+            <option value="ru">רוסית (Russian)</option>
+            <option value="ar">ערבית (Arabic)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-gray-500 dark:text-gray-400">קוד חדר</label>
+          <input type="text" id="roomCodeInput" placeholder="למשל: 123" value="123" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-bold" dir="ltr">
+        </div>
+
+        <button id="joinRoomBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg active:scale-95 transition">
+          היכנס לחדר
+        </button>
+      </div>
+
+      <hr class="border-gray-200 dark:border-gray-700">
+
+      <!-- רשימת חדרים פעילים -->
+      <div>
+        <h2 class="text-xs font-semibold mb-2 text-gray-500 dark:text-gray-400 flex justify-between items-center">
+          <span>חדרים פעילים כעת</span>
+          <span id="activeRoomsCount" class="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full text-[10px]">0</span>
+        </h2>
+        <div id="activeRoomsList" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+          <div class="text-center text-xs text-gray-400 py-3">אין חדרים פעילים ברגע זה</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- מסך צ'אט -->
+  <div id="chatScreen" class="hidden flex-col h-full max-w-2xl w-full mx-auto bg-white dark:bg-gray-800 shadow-2xl relative">
+    
+    <header class="p-3 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-b border-gray-200 dark:border-gray-700 flex justify-between items-center sticky top-0 z-10">
+      <div class="flex items-center gap-3">
+        <button id="leaveRoomBtn" class="p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">➡️</button>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+            <h2 id="currentRoomTitle" class="font-bold text-sm">חדר: ---</h2>
+            <!-- כפתור נעילת חדר -->
+            <button id="lockRoomBtn" title="נעול/שחרר חדר" class="text-xs p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+              🔓
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-[10px] text-gray-400">
+            <span id="currentLangBadge">שפה: עברית</span>
+            <span>•</span>
+            <span id="onlineUsersCount">👥 1 מחוברים</span>
+          </div>
+        </div>
+      </div>
+      <button id="themeToggleChat" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-700">🌙</button>
+    </header>
+
+    <main id="chatBox" class="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50 dark:bg-gray-900/40">
+      <!-- הודעות -->
+    </main>
+
+    <!-- אזור תצוגה מקדימה לתמונה לפני שליחה -->
+    <div id="imagePreviewContainer" class="hidden px-4 py-2 bg-gray-100 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <img id="imagePreview" src="" class="w-12 h-12 object-cover rounded-lg border">
+        <span class="text-xs text-gray-500 dark:text-gray-300">תמונה מוכנה לשליחה</span>
+      </div>
+      <button id="cancelImageBtn" class="text-xs text-red-500 hover:underline">בטל</button>
+    </div>
+
+    <footer class="p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
+      <form id="messageForm" class="flex items-center gap-2">
+        
+        <label for="imageInput" class="p-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-2xl cursor-pointer text-gray-600 dark:text-gray-300 transition flex items-center justify-center">
+          📷
+          <input type="file" id="imageInput" accept="image/*" class="hidden">
+        </label>
+
+        <input type="text" id="messageInput" placeholder="הקלד הודעה..." class="flex-1 bg-gray-100 dark:bg-gray-700 border-0 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" autocomplete="off">
+        
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-2xl font-semibold active:scale-95 transition">
+          <svg class="w-5 h-5 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+        </button>
+      </form>
+    </footer>
+
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      databaseURL: "https://en-shemer-booking-default-rtdb.europe-west1.firebasedatabase.app"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const userId = "user_" + Math.random().toString(36).substr(2, 7);
+    let currentRoomId = null;
+    let currentRoomRef = null;
+    let roomMetaRef = null;
+    let myPresenceRef = null;
+    let myLanguage = "he";
+    let selectedImageBase64 = null;
+    let isRoomLocked = false;
+
+    const roomSelectionScreen = document.getElementById('roomSelectionScreen');
+    const chatScreen = document.getElementById('chatScreen');
+    const roomCodeInput = document.getElementById('roomCodeInput');
+    const userLanguageSelect = document.getElementById('userLanguage');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+    const lockRoomBtn = document.getElementById('lockRoomBtn');
+    const currentRoomTitle = document.getElementById('currentRoomTitle');
+    const currentLangBadge = document.getElementById('currentLangBadge');
+    const onlineUsersCount = document.getElementById('onlineUsersCount');
+    const chatBox = document.getElementById('chatBox');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const imageInput = document.getElementById('imageInput');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+    const cancelImageBtn = document.getElementById('cancelImageBtn');
+    const activeRoomsList = document.getElementById('activeRoomsList');
+
+    // Theme Toggle
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      document.getElementById('themeToggleLogin').innerText = isDark ? '☀️' : '🌙';
+      document.getElementById('themeToggleChat').innerText = isDark ? '☀️' : '🌙';
+    }
+    document.getElementById('themeToggleLogin').addEventListener('click', toggleDarkMode);
+    document.getElementById('themeToggleChat').addEventListener('click', toggleDarkMode);
+
+    // --- טעינת רשימת החדרים הפעילים בזמן אמת ---
+    db.ref('room_meta').on('value', (snapshot) => {
+      const rooms = snapshot.val();
+      activeRoomsList.innerHTML = '';
+
+      if (!rooms) {
+        activeRoomsList.innerHTML = `<div class="text-center text-xs text-gray-400 py-3">אין חדרים פעילים ברגע זה</div>`;
+        document.getElementById('activeRoomsCount').innerText = '0';
+        return;
+      }
+
+      const keys = Object.keys(rooms);
+      document.getElementById('activeRoomsCount').innerText = keys.length;
+
+      keys.forEach((rId) => {
+        const meta = rooms[rId];
+        const usersCount = meta.users ? Object.keys(meta.users).length : 0;
+
+        // אם אין משתמשים בחדר, ננקה אותו
+        if (usersCount === 0) {
+          db.ref(`room_meta/${rId}`).remove();
+          return;
+        }
+
+        const isLocked = meta.locked || false;
+
+        const roomCard = document.createElement('div');
+        roomCard.className = "flex justify-between items-center p-2.5 bg-gray-50 dark:bg-gray-700/60 rounded-xl border border-gray-100 dark:border-gray-600 hover:border-indigo-300 transition cursor-pointer";
+        roomCard.onclick = () => { roomCodeInput.value = rId; };
+
+        roomCard.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold font-mono text-gray-700 dark:text-gray-200">${rId}</span>
+            <span class="text-xs">${isLocked ? '🔒' : '🔓'}</span>
+          </div>
+          <span class="text-[11px] bg-indigo-50 dark:bg-gray-600 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-md font-semibold">
+            👤 ${usersCount} מחוברים
+          </span>
+        `;
+        activeRoomsList.appendChild(roomCard);
+      });
+    });
+
+    // כיווץ תמונות
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxDim) {
+            height *= maxDim / width;
+            width = maxDim;
+          } else if (height > maxDim) {
+            width *= maxDim / height;
+            height = maxDim;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          imagePreview.src = selectedImageBase64;
+          imagePreviewContainer.classList.remove('hidden');
+          imagePreviewContainer.classList.add('flex');
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    cancelImageBtn.addEventListener('click', () => {
+      selectedImageBase64 = null;
+      imageInput.value = '';
+      imagePreviewContainer.classList.add('hidden');
+      imagePreviewContainer.classList.remove('flex');
+    });
+
+    // תרגום ברקע
+    async function translateText(text, targetLang) {
+      if (!text) return '';
+      try {
+        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`);
+        const data = await res.json();
+        return data[0].map(item => item[0]).join('');
+      } catch (err) {
+        return text;
+      }
+    }
+
+    // כניסה לחדר
+    joinRoomBtn.addEventListener('click', async () => {
+      const rawRoomCode = roomCodeInput.value.trim().toLowerCase();
+      if (!rawRoomCode) return alert('נא להזין קוד חדר');
+
+      currentRoomId = rawRoomCode.replace(/[^a-z0-9_-]/g, '');
+      myLanguage = userLanguageSelect.value;
+
+      // בדיקה אם החדר נעול לפני הכניסה
+      const roomSnap = await db.ref(`room_meta/${currentRoomId}`).once('value');
+      const roomMeta = roomSnap.val();
+
+      if (roomMeta && roomMeta.locked) {
+        // בודק אם המשתמש כבר רשום בחדר
+        const isUserInside = roomMeta.users && roomMeta.users[userId];
+        if (!isUserInside) {
+          alert('🔒 חדר זה נעול לכניסת משתמשים חדשים על ידי יושבי החדר!');
+          return;
+        }
+      }
+
+      currentRoomTitle.innerText = `חדר: ${currentRoomId}`;
+      currentLangBadge.innerText = `שפה: ${userLanguageSelect.options[userLanguageSelect.selectedIndex].text.split(' ')[0]}`;
+
+      roomSelectionScreen.classList.add('hidden');
+      chatScreen.classList.remove('hidden');
+      chatScreen.classList.add('flex');
+
+      chatBox.innerHTML = '';
+      currentRoomRef = db.ref(`chats/${currentRoomId}`);
+      roomMetaRef = db.ref(`room_meta/${currentRoomId}`);
+
+      // רישום נוכחות המשתמש בחדר
+      myPresenceRef = db.ref(`room_meta/${currentRoomId}/users/${userId}`);
+      myPresenceRef.set(true);
+      myPresenceRef.onDisconnect().remove(); // מוחק את המשתמש אוטומטית כשהוא מנתק/סוגר את הלשונית
+
+      // האזנה לשינויים בנעילה ובמספר המשתמשים
+      roomMetaRef.on('value', (snap) => {
+        const data = snap.val();
+        if (data) {
+          isRoomLocked = data.locked || false;
+          lockRoomBtn.innerText = isRoomLocked ? '🔒' : '🔓';
+          
+          const usersCount = data.users ? Object.keys(data.users).length : 1;
+          onlineUsersCount.innerText = `👥 ${usersCount} מחוברים`;
+        }
+      });
+
+      // טעינת הודעות
+      currentRoomRef.limitToLast(50).on('child_added', (snapshot) => {
+        const msg = snapshot.val();
+        const msgKey = snapshot.key;
+        const isMe = msg.sender === userId;
+
+        appendMessageElement(msgKey, isMe ? msg.text : "מתרגם...", msg.text, msg.image, isMe);
+
+        if (!isMe && msg.text) {
+          translateText(msg.text, myLanguage).then(translated => {
+            updateMessageText(msgKey, translated);
+          });
+        }
+      });
+    });
+
+    // נעילה / שחרור חדר
+    lockRoomBtn.addEventListener('click', () => {
+      if (!roomMetaRef) return;
+      isRoomLocked = !isRoomLocked;
+      roomMetaRef.child('locked').set(isRoomLocked);
+    });
+
+    // יציאה מחדר
+    leaveRoomBtn.addEventListener('click', () => {
+      if (myPresenceRef) myPresenceRef.remove();
+      if (currentRoomRef) currentRoomRef.off();
+      if (roomMetaRef) roomMetaRef.off();
+
+      chatScreen.classList.add('hidden');
+      chatScreen.classList.remove('flex');
+      roomSelectionScreen.classList.remove('hidden');
+    });
+
+    // שליחת הודעה
+    messageForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = messageInput.value.trim();
+      
+      if ((!text && !selectedImageBase64) || !currentRoomRef) return;
+
+      currentRoomRef.push({
+        sender: userId,
+        text: text || "",
+        image: selectedImageBase64 || null,
+        timestamp: Date.now()
+      });
+
+      messageInput.value = '';
+      cancelImageBtn.click();
+    });
+
+    function appendMessageElement(key, textToShow, originalText, imageUrl, isMe) {
+      const wrapper = document.createElement('div');
+      wrapper.id = `msg-${key}`;
+      wrapper.className = `flex flex-col ${isMe ? 'items-start' : 'items-end'} animate-msg`;
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `max-w-[85%] sm:max-w-[70%] p-3.5 rounded-2xl shadow-sm text-sm ${
+        isMe 
+          ? 'bg-indigo-600 text-white rounded-br-none' 
+          : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-bl-none'
+      }`;
+
+      let imgHtml = imageUrl ? `<a href="${imageUrl}" target="_blank"><img src="${imageUrl}" class="rounded-xl mb-2 max-h-60 w-full object-cover shadow-sm hover:opacity-95 transition"></a>` : '';
+      let textHtml = textToShow ? `<div class="msg-content break-words">${textToShow}</div>` : '';
+      let subText = (!isMe && originalText) ? `<div class="text-[10px] opacity-60 mt-1.5 pt-1 border-t border-gray-200/30">מקור: ${originalText}</div>` : '';
+
+      msgDiv.innerHTML = `${imgHtml}${textHtml}${subText}`;
+      wrapper.appendChild(msgDiv);
+      chatBox.appendChild(wrapper);
+
+      chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+    }
+
+    function updateMessageText(key, newText) {
+      const wrapper = document.getElementById(`msg-${key}`);
+      if (wrapper) {
+        const contentDiv = wrapper.querySelector('.msg-content');
+        if (contentDiv) contentDiv.innerText = newText;
+      }
+    }
+  </script>
+</body>
+</html>
