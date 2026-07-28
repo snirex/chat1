@@ -11,6 +11,8 @@
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <!-- QR Code Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
@@ -79,9 +81,11 @@
           <div class="flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
             <h2 id="currentRoomTitle" class="font-bold text-sm">חדר: ---</h2>
-            <!-- כפתור נעילת חדר -->
             <button id="lockRoomBtn" title="נעול/שחרר חדר" class="text-xs p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
               🔓
+            </button>
+            <button id="shareRoomBtn" title="שיתוף חדר וקוד QR" class="text-xs p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+              🔗
             </button>
           </div>
           <div class="flex items-center gap-2 text-[10px] text-gray-400">
@@ -98,7 +102,12 @@
       <!-- הודעות -->
     </main>
 
-    <!-- אזור תצוגה מקדימה לתמונה לפני שליחה -->
+    <!-- חיווי מקליד/ה -->
+    <div id="typingIndicator" class="hidden px-4 py-1 text-xs text-gray-400 dark:text-gray-500 italic bg-gray-50 dark:bg-gray-900/40">
+      מישהו מקליד...
+    </div>
+
+    <!-- אזור תצוגה מקדימה לתמונה -->
     <div id="imagePreviewContainer" class="hidden px-4 py-2 bg-gray-100 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <img id="imagePreview" src="" class="w-12 h-12 object-cover rounded-lg border">
@@ -115,6 +124,11 @@
           <input type="file" id="imageInput" accept="image/*" class="hidden">
         </label>
 
+        <!-- כפתור הקלטה קולית -->
+        <button type="button" id="micBtn" class="p-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-2xl text-gray-600 dark:text-gray-300 transition flex items-center justify-center">
+          🎙️
+        </button>
+
         <input type="text" id="messageInput" placeholder="הקלד הודעה..." class="flex-1 bg-gray-100 dark:bg-gray-700 border-0 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" autocomplete="off">
         
         <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-2xl font-semibold active:scale-95 transition">
@@ -123,6 +137,20 @@
       </form>
     </footer>
 
+  </div>
+
+  <!-- Modal שיתוף ו-QR -->
+  <div id="shareModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+      <h3 class="font-bold text-lg text-gray-800 dark:text-white">שתף את החדר</h3>
+      <div id="qrcode" class="flex justify-center p-2 bg-white rounded-xl shadow-inner my-2"></div>
+      <p class="text-xs text-gray-500 dark:text-gray-400">סרוק בטלפון או העתק את הקישור למטה</p>
+      <input type="text" id="shareUrlInput" readonly class="w-full bg-gray-100 dark:bg-gray-700 p-2.5 rounded-xl text-xs text-center border font-mono outline-none" dir="ltr">
+      <div class="flex gap-2">
+        <button id="copyShareUrlBtn" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-xs font-semibold hover:bg-indigo-700 transition">העתק קישור</button>
+        <button onclick="closeShareModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-semibold">סגור</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -141,6 +169,7 @@
     let myLanguage = "he";
     let selectedImageBase64 = null;
     let isRoomLocked = false;
+    let typingTimeout = null;
 
     const roomSelectionScreen = document.getElementById('roomSelectionScreen');
     const chatScreen = document.getElementById('chatScreen');
@@ -149,6 +178,7 @@
     const joinRoomBtn = document.getElementById('joinRoomBtn');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const lockRoomBtn = document.getElementById('lockRoomBtn');
+    const shareRoomBtn = document.getElementById('shareRoomBtn');
     const currentRoomTitle = document.getElementById('currentRoomTitle');
     const currentLangBadge = document.getElementById('currentLangBadge');
     const onlineUsersCount = document.getElementById('onlineUsersCount');
@@ -156,10 +186,18 @@
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
     const imageInput = document.getElementById('imageInput');
+    const micBtn = document.getElementById('micBtn');
+    const typingIndicator = document.getElementById('typingIndicator');
     const imagePreviewContainer = document.getElementById('imagePreviewContainer');
     const imagePreview = document.getElementById('imagePreview');
     const cancelImageBtn = document.getElementById('cancelImageBtn');
     const activeRoomsList = document.getElementById('activeRoomsList');
+
+    // בדיקת פרמטר ב-URL לכניסה ישירה לחדר
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('room')) {
+      roomCodeInput.value = urlParams.get('room');
+    }
 
     // Theme Toggle
     function toggleDarkMode() {
@@ -171,7 +209,80 @@
     document.getElementById('themeToggleLogin').addEventListener('click', toggleDarkMode);
     document.getElementById('themeToggleChat').addEventListener('click', toggleDarkMode);
 
-    // --- טעינת רשימת החדרים הפעילים בזמן אמת ---
+    // --- 1. הקראת הודעות קולית (Text-To-Speech) ---
+    function speakText(text, langCode) {
+      if (!('speechSynthesis' in window)) return alert('הדפדפן שלך אינו תומך בהקראת קול');
+      window.speechSynthesis.cancel(); // עצירת הקראה קודמת במידה ופועלת
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = langCode;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // --- 2. זיהוי דיבור להודעות קוליות (Speech-To-Text) ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      micBtn.addEventListener('click', () => {
+        recognition.lang = myLanguage;
+        recognition.start();
+        micBtn.classList.add('bg-red-500', 'text-white', 'animate-pulse');
+      });
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        messageInput.value = transcript;
+        micBtn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
+      };
+
+      recognition.onerror = () => {
+        micBtn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
+      };
+
+      recognition.onend = () => {
+        micBtn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
+      };
+    } else {
+      micBtn.style.display = 'none'; // הסתרה אם הדפדפן אינו תומך
+    }
+
+    // --- 3. חיווי מקליד/ה בזמן אמת ---
+    messageInput.addEventListener('input', () => {
+      if (!roomMetaRef) return;
+      roomMetaRef.child(`typing/${userId}`).set(true);
+
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        roomMetaRef.child(`typing/${userId}`).remove();
+      }, 2000);
+    });
+
+    // --- 4. שיתוף וקוד QR ---
+    shareRoomBtn.addEventListener('click', () => {
+      const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
+      document.getElementById('shareUrlInput').value = shareUrl;
+      
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, { text: shareUrl, width: 140, height: 140 });
+
+      document.getElementById('shareModal').classList.remove('hidden');
+    });
+
+    document.getElementById('copyShareUrlBtn').addEventListener('click', () => {
+      const urlInput = document.getElementById('shareUrlInput');
+      urlInput.select();
+      navigator.clipboard.writeText(urlInput.value);
+      alert('הקישור הועתק ללוח!');
+    });
+
+    function closeShareModal() {
+      document.getElementById('shareModal').classList.add('hidden');
+    }
+
+    // רשימת חדרים פעילים
     db.ref('room_meta').on('value', (snapshot) => {
       const rooms = snapshot.val();
       activeRoomsList.innerHTML = '';
@@ -189,7 +300,6 @@
         const meta = rooms[rId];
         const usersCount = meta.users ? Object.keys(meta.users).length : 0;
 
-        // אם אין משתמשים בחדר, ננקה אותו
         if (usersCount === 0) {
           db.ref(`room_meta/${rId}`).remove();
           return;
@@ -278,15 +388,13 @@
       currentRoomId = rawRoomCode.replace(/[^a-z0-9_-]/g, '');
       myLanguage = userLanguageSelect.value;
 
-      // בדיקה אם החדר נעול לפני הכניסה
       const roomSnap = await db.ref(`room_meta/${currentRoomId}`).once('value');
       const roomMeta = roomSnap.val();
 
       if (roomMeta && roomMeta.locked) {
-        // בודק אם המשתמש כבר רשום בחדר
         const isUserInside = roomMeta.users && roomMeta.users[userId];
         if (!isUserInside) {
-          alert('🔒 חדר זה נעול לכניסת משתמשים חדשים על ידי יושבי החדר!');
+          alert('🔒 חדר זה נעול לכניסת משתמשים חדשים!');
           return;
         }
       }
@@ -302,12 +410,11 @@
       currentRoomRef = db.ref(`chats/${currentRoomId}`);
       roomMetaRef = db.ref(`room_meta/${currentRoomId}`);
 
-      // רישום נוכחות המשתמש בחדר
       myPresenceRef = db.ref(`room_meta/${currentRoomId}/users/${userId}`);
       myPresenceRef.set(true);
-      myPresenceRef.onDisconnect().remove(); // מוחק את המשתמש אוטומטית כשהוא מנתק/סוגר את הלשונית
+      myPresenceRef.onDisconnect().remove();
 
-      // האזנה לשינויים בנעילה ובמספר המשתמשים
+      // האזנה למצב החדר והקלדה
       roomMetaRef.on('value', (snap) => {
         const data = snap.val();
         if (data) {
@@ -316,6 +423,18 @@
           
           const usersCount = data.users ? Object.keys(data.users).length : 1;
           onlineUsersCount.innerText = `👥 ${usersCount} מחוברים`;
+
+          // האזנה לחיווי הקלדה
+          if (data.typing) {
+            const typers = Object.keys(data.typing).filter(id => id !== userId);
+            if (typers.length > 0) {
+              typingIndicator.classList.remove('hidden');
+            } else {
+              typingIndicator.classList.add('hidden');
+            }
+          } else {
+            typingIndicator.classList.add('hidden');
+          }
         }
       });
 
@@ -335,14 +454,12 @@
       });
     });
 
-    // נעילה / שחרור חדר
     lockRoomBtn.addEventListener('click', () => {
       if (!roomMetaRef) return;
       isRoomLocked = !isRoomLocked;
       roomMetaRef.child('locked').set(isRoomLocked);
     });
 
-    // יציאה מחדר
     leaveRoomBtn.addEventListener('click', () => {
       if (myPresenceRef) myPresenceRef.remove();
       if (currentRoomRef) currentRoomRef.off();
@@ -353,7 +470,6 @@
       roomSelectionScreen.classList.remove('hidden');
     });
 
-    // שליחת הודעה
     messageForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const text = messageInput.value.trim();
@@ -366,6 +482,8 @@
         image: selectedImageBase64 || null,
         timestamp: Date.now()
       });
+
+      if (roomMetaRef) roomMetaRef.child(`typing/${userId}`).remove();
 
       messageInput.value = '';
       cancelImageBtn.click();
@@ -385,9 +503,13 @@
 
       let imgHtml = imageUrl ? `<a href="${imageUrl}" target="_blank"><img src="${imageUrl}" class="rounded-xl mb-2 max-h-60 w-full object-cover shadow-sm hover:opacity-95 transition"></a>` : '';
       let textHtml = textToShow ? `<div class="msg-content break-words">${textToShow}</div>` : '';
+      
+      // כפתור הקראה קולית להודעות נכנסות
+      let ttsBtn = (!isMe && textToShow) ? `<button onclick="speakText(this.previousElementSibling.innerText, '${myLanguage}')" class="text-xs opacity-70 hover:opacity-100 mt-1" title="הקרא הודעה">🔊 השמע</button>` : '';
+      
       let subText = (!isMe && originalText) ? `<div class="text-[10px] opacity-60 mt-1.5 pt-1 border-t border-gray-200/30">מקור: ${originalText}</div>` : '';
 
-      msgDiv.innerHTML = `${imgHtml}${textHtml}${subText}`;
+      msgDiv.innerHTML = `${imgHtml}${textHtml}${ttsBtn}${subText}`;
       wrapper.appendChild(msgDiv);
       chatBox.appendChild(wrapper);
 
