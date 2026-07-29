@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="he" dir="rtl" class="h-full">
 <head>
@@ -13,16 +14,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </head>
 <body class="bg-slate-100 dark:bg-gray-900 min-h-screen text-slate-800 dark:text-gray-100 p-4 sm:p-6 transition-colors duration-200">
-
   <div class="max-w-6xl mx-auto space-y-6">
-    
+
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
       <div>
         <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <span>🛠️</span> פאנל ניהול שיחות
         </h1>
-        <p class="text-sm text-slate-500 dark:text-gray-400 mt-1">צפייה, עריכה ומחיקה של חדרים, הודעות ותמונות בזמן אמת</p>
+        <p class="text-sm text-slate-500 dark:text-gray-400 mt-1">צפייה, נעילה, הוספה ומחיקה של חדרים והודעות בזמן אמת</p>
       </div>
       <div class="flex items-center gap-3">
         <!-- מתג מצב לילה / יום -->
@@ -35,7 +35,6 @@
           <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
           מתחבר...
         </span>
-
         <button onclick="loadAllData()" class="bg-slate-100 dark:bg-gray-700 hover:bg-slate-200 dark:hover:bg-gray-600 text-slate-700 dark:text-gray-200 px-3 py-2 rounded-xl text-xs font-semibold transition">
           🔄 רענן
         </button>
@@ -46,7 +45,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
       <!-- רשימת חדרים -->
-      <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-gray-700 flex flex-col h-[70vh] transition-colors">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-gray-700 flex flex-col h-[75vh] transition-colors">
         <h2 class="font-bold text-lg mb-3 flex justify-between items-center text-slate-800 dark:text-white">
           <span>רשימת חדרים</span>
           <span id="roomCount" class="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 text-xs px-2 py-0.5 rounded-full">0</span>
@@ -57,28 +56,45 @@
       </div>
 
       <!-- תצוגת ההודעות בחדר הנבחר -->
-      <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-gray-700 flex flex-col h-[70vh] transition-colors">
+      <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-gray-700 flex flex-col h-[75vh] transition-colors">
         
-        <!-- כותרת החדר הנבחר -->
-        <div class="border-b border-slate-100 dark:border-gray-700 pb-4 mb-4 flex justify-between items-center flex-wrap gap-2">
+        <!-- כותרת החדר הנבחר ופעולות ניהול -->
+        <div class="border-b border-slate-100 dark:border-gray-700 pb-4 mb-3 flex justify-between items-center flex-wrap gap-2">
           <div>
             <h3 id="selectedRoomTitle" class="font-bold text-xl text-slate-900 dark:text-white">בחר חדר לצפייה</h3>
             <span id="selectedRoomInfo" class="text-xs text-slate-400 dark:text-gray-500">יש לבחור חדר מרשימת החדרים מימין</span>
           </div>
-          <button id="deleteRoomBtn" class="hidden bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-xl text-xs font-semibold transition items-center gap-1">
-            🗑️ מחק חדר זה לחלוטין
-          </button>
+          
+          <div class="flex items-center gap-2">
+            <!-- כפתור נעילה / שחרור חדר למנהל -->
+            <button id="toggleLockRoomBtn" class="hidden px-3 py-1.5 rounded-xl text-xs font-semibold border transition items-center gap-1.5 active:scale-95">
+              <span id="lockBtnIcon">🔓</span>
+              <span id="lockBtnText">פתוח</span>
+            </button>
+
+            <!-- כפתור מחיקת חדר -->
+            <button id="deleteRoomBtn" class="hidden bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-xl text-xs font-semibold transition items-center gap-1">
+              🗑️ מחק חדר
+            </button>
+          </div>
         </div>
 
         <!-- אזור הצגת ההודעות -->
-        <div id="messagesContainer" class="flex-1 overflow-y-auto space-y-3 p-2 bg-slate-50/50 dark:bg-gray-900/50 rounded-xl border border-slate-100 dark:border-gray-700/50">
+        <div id="messagesContainer" class="flex-1 overflow-y-auto space-y-3 p-3 bg-slate-50/50 dark:bg-gray-900/50 rounded-xl border border-slate-100 dark:border-gray-700/50">
           <div class="text-center text-slate-400 dark:text-gray-500 py-20 text-sm">טרם נבחר חדר</div>
         </div>
 
+        <!-- אזור הוספת הודעת מנהל -->
+        <form id="adminMessageForm" class="hidden mt-3 pt-3 border-t border-slate-100 dark:border-gray-700 flex gap-2">
+          <input type="text" id="adminInput" placeholder="הוסף הודעה כ-מנהל מערכת..." class="flex-1 bg-slate-100 dark:bg-gray-700 border-0 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none" autocomplete="off">
+          <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition active:scale-95 flex items-center gap-1">
+            <span>➕</span>
+            <span>שלח</span>
+          </button>
+        </form>
+
       </div>
-
     </div>
-
   </div>
 
   <!-- Modal לעריכת הודעה -->
@@ -97,7 +113,6 @@
   </div>
 
   <script>
-    // ⚠️ התאמת הגדרות Firebase
     const firebaseConfig = {
       databaseURL: "https://en-shemer-booking-default-rtdb.europe-west1.firebasedatabase.app"
     };
@@ -107,6 +122,7 @@
 
     let activeRoomId = null;
     let editingMsgKey = null;
+    let isCurrentRoomLocked = false;
 
     // --- ניהול Dark Mode / Light Mode ---
     function toggleDarkMode() {
@@ -137,7 +153,7 @@
       }
     });
 
-    // טעינת כל הנתונים
+    // טעינת כל הנתונים בזמן אמת
     function loadAllData() {
       db.ref("chats").on("value", (snapshot) => {
         const roomsList = document.getElementById("roomsList");
@@ -154,7 +170,14 @@
         roomsList.innerHTML = "";
 
         roomKeys.forEach((roomId) => {
-          const messages = roomsData[roomId] ? Object.keys(roomsData[roomId]).length : 0;
+          const roomObj = roomsData[roomId] || {};
+          const messagesObj = roomObj.messages || {};
+          const msgCount = Object.keys(messagesObj).length;
+
+          const presenceObj = roomObj.presence || {};
+          const usersCount = Object.keys(presenceObj).length;
+
+          const isLocked = roomObj.settings && roomObj.settings.isLocked;
           const isSelected = roomId === activeRoomId;
 
           const btn = document.createElement("button");
@@ -163,36 +186,87 @@
               ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/40 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 font-bold' 
               : 'bg-white hover:bg-slate-50 dark:bg-gray-800 dark:hover:bg-gray-700 border-slate-100 dark:border-gray-700 text-slate-700 dark:text-gray-200'
           }`;
-          btn.onclick = () => selectRoom(roomId, roomsData[roomId]);
+          btn.onclick = () => selectRoom(roomId);
 
+          const lockBadge = isLocked ? '🔒' : '💬';
           btn.innerHTML = `
             <div class="flex items-center gap-2 truncate">
-              <span>💬</span>
+              <span>${lockBadge}</span>
               <span class="truncate">${roomId}</span>
             </div>
-            <span class="text-xs bg-slate-100 dark:bg-gray-700 px-2 py-1 rounded-md text-slate-500 dark:text-gray-400 font-normal">${messages} הודעות</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded-md font-normal">👥 ${usersCount}</span>
+              <span class="text-xs bg-slate-100 dark:bg-gray-700 px-2 py-1 rounded-md text-slate-500 dark:text-gray-400 font-normal">${msgCount} הודעות</span>
+            </div>
           `;
           roomsList.appendChild(btn);
         });
 
         if (activeRoomId && roomsData[activeRoomId]) {
-          renderMessages(roomsData[activeRoomId]);
+          renderRoomContent(activeRoomId, roomsData[activeRoomId]);
         }
       });
     }
 
     // בחירת חדר
-    function selectRoom(roomId, messagesData) {
+    function selectRoom(roomId) {
       activeRoomId = roomId;
+      db.ref(`chats/${roomId}`).once('value', (snap) => {
+        renderRoomContent(roomId, snap.val() || {});
+      });
+    }
+
+    // הצגת תוכן החדר הנבחר (הודעות + הגדרות)
+    function renderRoomContent(roomId, roomObj) {
       document.getElementById("selectedRoomTitle").innerText = `חדר: ${roomId}`;
-      
+
+      // כפתור מחיקה
       const deleteRoomBtn = document.getElementById("deleteRoomBtn");
       deleteRoomBtn.classList.remove("hidden");
       deleteRoomBtn.classList.add("flex");
       deleteRoomBtn.onclick = () => deleteRoom(roomId);
 
-      renderMessages(messagesData);
-      loadAllData();
+      // טופס שליחת הודעת מנהל
+      const adminForm = document.getElementById("adminMessageForm");
+      adminForm.classList.remove("hidden");
+
+      // נעילה/שחרור
+      const toggleLockBtn = document.getElementById("toggleLockRoomBtn");
+      const lockBtnIcon = document.getElementById("lockBtnIcon");
+      const lockBtnText = document.getElementById("lockBtnText");
+      
+      toggleLockBtn.classList.remove("hidden");
+      toggleLockBtn.classList.add("flex");
+
+      const isLocked = roomObj.settings && roomObj.settings.isLocked;
+      isCurrentRoomLocked = !!isLocked;
+
+      if (isLocked) {
+        lockBtnIcon.innerText = '🔒';
+        lockBtnText.innerText = 'נעול';
+        toggleLockBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 border border-amber-300 dark:border-amber-700 transition active:scale-95";
+      } else {
+        lockBtnIcon.innerText = '🔓';
+        lockBtnText.innerText = 'פתוח';
+        toggleLockBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-gray-700 dark:text-gray-200 border border-slate-200 dark:border-gray-600 transition active:scale-95";
+      }
+
+      toggleLockBtn.onclick = () => toggleRoomLock(roomId);
+
+      // הצגת הודעות
+      renderMessages(roomObj.messages || {});
+    }
+
+    // נעילה / שחרור חדר ע"י המנהל
+    function toggleRoomLock(roomId) {
+      const newLockState = !isCurrentRoomLocked;
+      const updates = { isLocked: newLockState };
+
+      if (!newLockState) {
+        updates.unlockedManually = true;
+      }
+
+      db.ref(`chats/${roomId}/settings`).update(updates);
     }
 
     // הצגת ההודעות של החדר הנבחר
@@ -200,13 +274,14 @@
       const container = document.getElementById("messagesContainer");
       container.innerHTML = "";
 
-      if (!messagesData) {
+      const keys = Object.keys(messagesData);
+      
+      if (keys.length === 0) {
         container.innerHTML = `<div class="text-center text-slate-400 dark:text-gray-500 py-20 text-sm">אין הודעות בחדר זה</div>`;
         document.getElementById("selectedRoomInfo").innerText = "0 הודעות";
         return;
       }
 
-      const keys = Object.keys(messagesData);
       document.getElementById("selectedRoomInfo").innerText = `${keys.length} הודעות בזמן אמת`;
 
       keys.forEach((msgKey) => {
@@ -216,20 +291,22 @@
         const card = document.createElement("div");
         card.className = "bg-white dark:bg-gray-800 p-3.5 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm flex flex-col gap-2 relative group transition-colors";
 
-        // תצוגת תמונה במידה וקיימת בהודעה
         const imageHtml = msg.image 
           ? `<div class="mt-1">
-               <a href="${msg.image}" target="_blank" title="לחץ להגדלה">
-                 <img src="${msg.image}" class="rounded-lg max-h-48 max-w-full object-cover border border-slate-200 dark:border-gray-700 hover:opacity-90 transition">
-               </a>
-             </div>` 
+              <a href="${msg.image}" target="_blank" title="לחץ להגדלה">
+                <img src="${msg.image}" class="rounded-lg max-h-48 max-w-full object-cover border border-slate-200 dark:border-gray-700 hover:opacity-90 transition">
+              </a>
+            </div>` 
           : '';
 
         const textHtml = msg.text ? `<div class="text-slate-800 dark:text-gray-100 text-sm break-words">${escapeHtml(msg.text)}</div>` : '';
+        const senderBadge = msg.sender === 'מנהל מערכת' 
+          ? `<span class="font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 px-1.5 py-0.5 rounded text-[10px]">👑 מנהל מערכת</span>`
+          : `<span class="font-mono bg-slate-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-gray-300">${msg.sender || 'אנונימי'}</span>`;
 
         card.innerHTML = `
           <div class="flex justify-between items-center text-xs text-slate-400 dark:text-gray-500 border-b border-slate-50 dark:border-gray-700 pb-1.5">
-            <span class="font-mono bg-slate-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-gray-300">${msg.sender || 'אנונימי'}</span>
+            ${senderBadge}
             <span>${dateStr}</span>
           </div>
           ${imageHtml}
@@ -249,15 +326,32 @@
       container.scrollTop = container.scrollHeight;
     }
 
-    // מחיקת הודעה
+    // הוספת הודעת מנהל לחדר
+    document.getElementById("adminMessageForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = document.getElementById("adminInput");
+      const text = input.value.trim();
+
+      if (!text || !activeRoomId) return;
+
+      db.ref(`chats/${activeRoomId}/messages`).push({
+        sender: "מנהל מערכת",
+        text: text,
+        timestamp: Date.now()
+      }).then(() => {
+        input.value = "";
+      });
+    });
+
+    // מחיקת הודעה בודדת
     function deleteMessage(msgKey) {
       if (!activeRoomId) return;
       if (confirm("האם אתה בטוח שברצונך למחוק הודעה זו?")) {
-        db.ref(`chats/${activeRoomId}/${msgKey}`).remove();
+        db.ref(`chats/${activeRoomId}/messages/${msgKey}`).remove();
       }
     }
 
-    // מחיקת חדר
+    // מחיקת חדר לחלוטין
     function deleteRoom(roomId) {
       if (confirm(`אזהרה: האם למחוק את חדר "${roomId}" ואת כל ההודעות שבו?`)) {
         db.ref(`chats/${roomId}`).remove()
@@ -266,12 +360,14 @@
             document.getElementById("selectedRoomTitle").innerText = "בחר חדר לצפייה";
             document.getElementById("selectedRoomInfo").innerText = "יש לבחור חדר מרשימת החדרים מימין";
             document.getElementById("deleteRoomBtn").classList.add("hidden");
+            document.getElementById("toggleLockRoomBtn").classList.add("hidden");
+            document.getElementById("adminMessageForm").classList.add("hidden");
             document.getElementById("messagesContainer").innerHTML = `<div class="text-center text-slate-400 dark:text-gray-500 py-20 text-sm">טרם נבחר חדר</div>`;
           });
       }
     }
 
-    // מודאל עריכה
+    // מודאל עריכת הודעה
     function openEditModal(msgKey, currentText) {
       editingMsgKey = msgKey;
       document.getElementById("editInput").value = currentText;
@@ -287,7 +383,7 @@
       const newText = document.getElementById("editInput").value.trim();
       if (!activeRoomId || !editingMsgKey) return;
 
-      db.ref(`chats/${activeRoomId}/${editingMsgKey}/text`).set(newText)
+      db.ref(`chats/${activeRoomId}/messages/${editingMsgKey}/text`).set(newText)
         .then(() => closeEditModal());
     };
 
